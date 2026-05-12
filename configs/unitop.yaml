@@ -1,0 +1,12 @@
+mode: selected # selected | all
+
+services:
+  - docker.service
+  - bluetooth.service
+
+discovery:
+  include:
+    - "*.service"
+  exclude:
+    - "systemd-*"
+    - "user@*.service"
