@@ -42,3 +42,7 @@ func (s *ServiceStore) GetServiceEntry(serviceID string) (*model.ServiceEntry, b
 	entry, exists := s.entries[serviceID]
 	return entry, exists
 }
+
+func (s *ServiceStore) GetServiceEntries() map[string]*model.ServiceEntry {
+	return s.entries
+}

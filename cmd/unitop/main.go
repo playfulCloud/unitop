@@ -1,13 +1,14 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"time"
 
-	"github.com/playfulCloud/unitop/internal/cmdclient"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/playfulCloud/unitop/internal/config"
 	"github.com/playfulCloud/unitop/internal/store"
 	"github.com/playfulCloud/unitop/internal/systemd"
+	"github.com/playfulCloud/unitop/internal/tui"
 )
 
 func main() {
@@ -17,9 +18,14 @@ func main() {
 		panic(err)
 	}
 	store := store.NewServiceStore(cfg.ServiceNames, cfg.Properties)
-	command := systemd.BuildSystemctlShowWithArgs("docker.service", cfg.Properties)
-	result, err := cmdclient.Execute(*command)
-	fmt.Println(cfg)
-	fmt.Println(store)
-	fmt.Println(result)
+	c := systemd.NewCollector(*store, cfg.Properties)
+	p := tea.NewProgram(
+		tui.NewModel(c, 5*time.Second),
+		tea.WithAltScreen(),
+	)
+
+	if _, err := p.Run(); err != nil {
+		log.Fatal(err)
+	}
+
 }
