@@ -1,8 +1,34 @@
 mode: selected # selected | all
+refresh_interval: 5s
 
 services:
   - docker.service
   - bluetooth.service
+  - NetworkManager.service
+  # - ssh.service
+  # - dbus.service
+  # - systemd-journald.service
+  # - systemd-logind.service
+  # - cron.service
+  # - cups.service
+  # - avahi-daemon.service
+  # - firewalld.service
+  # - polkit.service
+  # - udisks2.service
+  # - ModemManager.service
+  # - wpa_supplicant.service
+  # - systemd-resolved.service
+
+properties:
+  - Id
+  - LoadState
+  - ActiveState
+  - SubState
+  - UnitFileState
+  - MainPID
+  - NRestarts
+  - ExecMainStatus
+  - ActiveEnterTimestamp
 
 discovery:
   include:

@@ -1,7 +1,17 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+
+	"github.com/playfulCloud/unitop/internal/config"
+)
 
 func main() {
-	fmt.Println("Siema")
+	cfg, err := config.ReadConfig("configs/unitop.yaml")
+	if err != nil {
+		log.Fatal(err)
+		panic(err)
+	}
+	fmt.Println(cfg)
 }
