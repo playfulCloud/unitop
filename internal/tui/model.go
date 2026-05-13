@@ -2,59 +2,36 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
-	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	ltable "github.com/charmbracelet/lipgloss/table"
 
 	"github.com/playfulCloud/unitop/internal/systemd"
 )
 
 type tickMsg time.Time
 
-type Model struct {
-	collector *systemd.Collector
-	table     table.Model
-	err       error
-	interval  time.Duration
+type actionDoneMsg struct {
+	err error
 }
 
-func NewModel(collector *systemd.Collector, interval time.Duration) Model {
-	columns := []table.Column{
-		{Title: "Service", Width: 32},
-		{Title: "Load", Width: 12},
-		{Title: "Active", Width: 12},
-		{Title: "Sub", Width: 14},
-		{Title: "PID", Width: 10},
-	}
+type Model struct {
+	collector         *systemd.SystemdManager
+	err               error
+	interval          time.Duration
+	selectedServiceID string
+	viewportOffset    int
+	tableHeight       int
+}
 
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithRows([]table.Row{}),
-		table.WithFocused(true),
-		table.WithHeight(15),
-	)
-
-	styles := table.DefaultStyles()
-
-	styles.Header = styles.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true).
-		Bold(true)
-
-	styles.Selected = styles.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(true)
-
-	t.SetStyles(styles)
-
+func NewModel(collector *systemd.SystemdManager, interval time.Duration) Model {
 	return Model{
-		collector: collector,
-		table:     t,
-		interval:  interval,
+		collector:   collector,
+		interval:    interval,
+		tableHeight: 20,
 	}
 }
 
@@ -68,51 +45,153 @@ func tick(interval time.Duration) tea.Cmd {
 	})
 }
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
+func executeActionCmd(
+	manager *systemd.SystemdManager,
+	serviceID string,
+	action systemd.ServiceAction,
+) tea.Cmd {
+	return func() tea.Msg {
+		err := manager.ExecuteAction(serviceID, action)
+		return actionDoneMsg{err: err}
+	}
+}
 
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
-		err := m.collector.MonitorState()
-		if err != nil {
+		if err := m.collector.MonitorState(); err != nil {
 			m.err = err
 		} else {
 			m.err = nil
 		}
 
-		m.table.SetRows(m.buildRows())
+		m.normalizeSelection()
+		return m, tick(m.interval)
+
+	case actionDoneMsg:
+		if msg.err != nil {
+			m.err = msg.err
+		} else {
+			m.err = nil
+		}
 
 		return m, tick(m.interval)
 
 	case tea.KeyMsg:
-		key := msg
-
-		switch key.String() {
+		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+
+		case "up", "k":
+			m.moveUp()
+
+		case "down", "j":
+			m.moveDown()
+
+		default:
+			if action, ok := actionForKey(msg.String()); ok {
+				if m.selectedServiceID == "" {
+					return m, nil
+				}
+
+				return m, executeActionCmd(
+					m.collector,
+					m.selectedServiceID,
+					action,
+				)
+			}
 		}
 	}
 
-	m.table, cmd = m.table.Update(msg)
-	return m, cmd
+	return m, nil
 }
 
-func (m Model) buildRows() []table.Row {
-	entries := m.collector.Store.GetServiceEntries()
-
-	rows := make([]table.Row, 0, len(entries))
-
-	for serviceName, entry := range entries {
-		rows = append(rows, table.Row{
-			serviceName,
-			entry.Params["LoadState"],
-			entry.Params["ActiveState"],
-			entry.Params["SubState"],
-			entry.Params["MainPID"],
-		})
+func (m *Model) moveUp() {
+	serviceNames := m.sortedServiceNames()
+	if len(serviceNames) == 0 {
+		return
 	}
 
-	return rows
+	currentIndex := m.currentSelectedIndex(serviceNames)
+
+	if currentIndex > 0 {
+		currentIndex--
+	}
+
+	m.selectedServiceID = serviceNames[currentIndex]
+	m.adjustViewport(currentIndex)
+}
+
+func (m *Model) moveDown() {
+	serviceNames := m.sortedServiceNames()
+	if len(serviceNames) == 0 {
+		return
+	}
+
+	currentIndex := m.currentSelectedIndex(serviceNames)
+
+	if currentIndex < len(serviceNames)-1 {
+		currentIndex++
+	}
+
+	m.selectedServiceID = serviceNames[currentIndex]
+	m.adjustViewport(currentIndex)
+}
+
+func (m *Model) normalizeSelection() {
+	serviceNames := m.sortedServiceNames()
+
+	if len(serviceNames) == 0 {
+		m.selectedServiceID = ""
+		m.viewportOffset = 0
+		return
+	}
+
+	if m.selectedServiceID == "" || !contains(serviceNames, m.selectedServiceID) {
+		m.selectedServiceID = serviceNames[0]
+		m.viewportOffset = 0
+		return
+	}
+
+	currentIndex := m.currentSelectedIndex(serviceNames)
+	m.adjustViewport(currentIndex)
+}
+
+func (m *Model) adjustViewport(selectedIndex int) {
+	if selectedIndex < m.viewportOffset {
+		m.viewportOffset = selectedIndex
+	}
+
+	if selectedIndex >= m.viewportOffset+m.tableHeight {
+		m.viewportOffset = selectedIndex - m.tableHeight + 1
+	}
+
+	if m.viewportOffset < 0 {
+		m.viewportOffset = 0
+	}
+}
+
+func (m Model) currentSelectedIndex(serviceNames []string) int {
+	for index, serviceName := range serviceNames {
+		if serviceName == m.selectedServiceID {
+			return index
+		}
+	}
+
+	return 0
+}
+
+func (m Model) sortedServiceNames() []string {
+	entries := m.collector.Store.GetServiceEntries()
+
+	serviceNames := make([]string, 0, len(entries))
+	for serviceName := range entries {
+		serviceNames = append(serviceNames, serviceName)
+	}
+
+	sort.Strings(serviceNames)
+
+	return serviceNames
 }
 
 func (m Model) View() string {
@@ -123,14 +202,11 @@ func (m Model) View() string {
 		Render("⚡ Unitop - systemd service monitor")
 
 	box := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("63")).
-		Padding(1, 2).
-		Render(m.table.View())
+		Render(m.renderTable())
 
 	footer := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("241")).
-		Render("↑/↓ navigate • q quit • auto-refresh enabled")
+		Render(footerText())
 
 	errorText := ""
 	if m.err != nil {
@@ -141,4 +217,75 @@ func (m Model) View() string {
 	}
 
 	return title + "\n\n" + box + errorText + "\n" + footer + "\n"
+}
+
+func (m Model) renderTable() string {
+	entries := m.collector.Store.GetServiceEntries()
+	serviceNames := m.sortedServiceNames()
+
+	if len(serviceNames) == 0 {
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("244")).
+			Italic(true).
+			Render("No services to display")
+	}
+
+	start := m.viewportOffset
+	end := min(start+m.tableHeight, len(serviceNames))
+
+	rows := make([][]string, 0, end-start)
+
+	for _, serviceName := range serviceNames[start:end] {
+		entry := entries[serviceName]
+
+		rows = append(rows, []string{
+			serviceName,
+			emptyAsDash(entry.Params["LoadState"]),
+			emptyAsDash(entry.Params["ActiveState"]),
+			emptyAsDash(entry.Params["SubState"]),
+			formatPID(entry.Params["MainPID"]),
+		})
+	}
+
+	return ltable.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("240"))).
+		Headers("Service", "Load", "Active", "Sub", "PID").
+		Rows(rows...).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			base := lipgloss.NewStyle().Padding(0, 1)
+
+			if row == ltable.HeaderRow {
+				return base.
+					Bold(true).
+					Foreground(lipgloss.Color("252"))
+			}
+
+			serviceID := rows[row][0]
+			selected := serviceID == m.selectedServiceID
+
+			if selected {
+				return base.
+					Background(lipgloss.Color("57")).
+					Foreground(lipgloss.Color("229")).
+					Bold(true)
+			}
+
+			if col == 2 {
+				activeState := rows[row][2]
+				return styleForActiveState(base, activeState)
+			}
+
+			if col == 4 {
+				pid := rows[row][4]
+				if pid == "-" {
+					return base.Foreground(lipgloss.Color("244"))
+				}
+
+				return base.Foreground(lipgloss.Color("86"))
+			}
+
+			return base
+		}).
+		String()
 }
