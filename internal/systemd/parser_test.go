@@ -19,7 +19,7 @@ func TestParseCommandOutputSuccess(t *testing.T) {
 
 	result := parseCommandOutput(output)
 
-	if reflect.DeepEqual(expectedMapOutput, result) {
+	if !reflect.DeepEqual(expectedMapOutput, result) {
 		t.Fatalf("expected output to %v but got %v", expectedMapOutput, result)
 	}
 }

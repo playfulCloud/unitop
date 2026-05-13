@@ -2,15 +2,29 @@ package systemd
 
 import "strings"
 
-func parseCommandOutput(commandOutput string) map[string]string {
-	lines := strings.SplitSeq(commandOutput, "\n")
-	properties := make(map[string]string)
+func parseCommandOutput(output string) map[string]string {
+	result := make(map[string]string)
+
+	lines := strings.SplitSeq(output, "\n")
 
 	for line := range lines {
-		keyValueParts := strings.SplitN(line, "=", 2)
-		if len(keyValueParts) == 2 {
-			properties[keyValueParts[0]] = keyValueParts[1]
+		line = strings.TrimSpace(line)
+
+		if line == "" {
+			continue
 		}
+
+		parts := strings.SplitN(line, "=", 2)
+
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		result[key] = value
 	}
-	return properties
+
+	return result
 }
