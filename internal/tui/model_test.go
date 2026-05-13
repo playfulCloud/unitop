@@ -132,6 +132,113 @@ func TestActionDoneSchedulesSingleImmediateMonitor(t *testing.T) {
 	}
 }
 
+func TestSlashEntersFilterModeAndClearsPreviousFilter(t *testing.T) {
+	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
+		return "", nil
+	})
+
+	m := NewModel(manager, time.Second)
+	m.filterText = "old"
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	updatedModel := updated.(Model)
+
+	if !updatedModel.filterMode {
+		t.Fatal("expected filter mode to be enabled")
+	}
+
+	if updatedModel.filterText != "" {
+		t.Fatalf("expected filter text to be cleared, got %q", updatedModel.filterText)
+	}
+}
+
+func TestFilterModeAppendsTypedCharacters(t *testing.T) {
+	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
+		return "", nil
+	})
+
+	m := NewModel(manager, time.Second)
+	m.filterMode = true
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	updatedModel := updated.(Model)
+
+	if updatedModel.filterText != "d" {
+		t.Fatalf("expected filter text to be updated, got %q", updatedModel.filterText)
+	}
+}
+
+func TestFilterModeDoesNotExecuteActions(t *testing.T) {
+	executed := false
+
+	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
+		executed = true
+		return "", nil
+	})
+
+	m := NewModel(manager, time.Second)
+	m.filterMode = true
+	m.selectedServiceID = "docker.service"
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	updatedModel := updated.(Model)
+
+	if cmd != nil {
+		t.Fatalf("expected no action command in filter mode, got %T", cmd)
+	}
+
+	if executed {
+		t.Fatal("expected action not to be executed in filter mode")
+	}
+
+	if updatedModel.filterText != "r" {
+		t.Fatalf("expected r to be added to filter text, got %q", updatedModel.filterText)
+	}
+}
+
+func TestFilterEnterLeavesFilterModeButKeepsFilter(t *testing.T) {
+	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
+		return "", nil
+	})
+
+	m := NewModel(manager, time.Second)
+	m.filterMode = true
+	m.filterText = "dock"
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updatedModel := updated.(Model)
+
+	if updatedModel.filterMode {
+		t.Fatal("expected filter mode to be disabled")
+	}
+
+	if updatedModel.filterText != "dock" {
+		t.Fatalf("expected filter text to be kept, got %q", updatedModel.filterText)
+	}
+}
+
+func TestFilterTextFiltersSortedServiceNames(t *testing.T) {
+	manager := newTestManagerWithServices(t,
+		[]string{"docker.service", "nginx.service", "postgresql.service"},
+		func(command domainmodel.Command) (string, error) {
+			return "", nil
+		},
+	)
+
+	m := NewModel(manager, time.Second)
+	m.filterText = "gin"
+
+	names := m.sortedServiceNames()
+
+	if len(names) != 1 {
+		t.Fatalf("expected one filtered service, got %d", len(names))
+	}
+
+	if names[0] != "nginx.service" {
+		t.Fatalf("expected nginx.service, got %q", names[0])
+	}
+}
+
 func newTestManager(
 	t *testing.T,
 	execute func(command domainmodel.Command) (string, error),
@@ -140,6 +247,27 @@ func newTestManager(
 
 	serviceStore := store.NewServiceStore(
 		[]string{"docker.service"},
+		[]string{"LoadState", "ActiveState"},
+	)
+
+	manager := systemd.NewSystemdManager(
+		serviceStore,
+		[]string{"LoadState", "ActiveState"},
+	)
+	manager.Execute = execute
+
+	return manager
+}
+
+func newTestManagerWithServices(
+	t *testing.T,
+	services []string,
+	execute func(command domainmodel.Command) (string, error),
+) *systemd.SystemdManager {
+	t.Helper()
+
+	serviceStore := store.NewServiceStore(
+		services,
 		[]string{"LoadState", "ActiveState"},
 	)
 

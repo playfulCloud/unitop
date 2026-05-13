@@ -35,8 +35,8 @@ func main() {
 		}
 	}
 
-	store := store.NewServiceStore(serviceNames, cfg.Properties)
-	c := systemd.NewSystemdManager(store, cfg.Properties)
+	store := store.NewServiceStore(serviceNames, systemd.DefaultProperties)
+	c := systemd.NewSystemdManager(store, systemd.DefaultProperties)
 	c.MonitorState()
 
 	p := tea.NewProgram(

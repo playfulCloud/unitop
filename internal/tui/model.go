@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -30,6 +31,8 @@ type Model struct {
 	viewportOffset    int
 	tableHeight       int
 	monitoring        bool
+	filterMode        bool
+	filterText        string
 }
 
 func NewModel(systemdManager *systemd.SystemdManager, interval time.Duration) Model {
@@ -101,6 +104,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, monitorStateCmd(m.systemdManager)
 
 	case tea.KeyMsg:
+		if m.filterMode {
+			return m.updateFilter(msg)
+		}
+
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -110,6 +117,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "down", "j":
 			m.moveDown()
+
+		case "/":
+			m.filterMode = true
+			m.filterText = ""
+			m.normalizeSelection()
+			return m, nil
+
+		case "esc":
+			m.filterText = ""
+			m.normalizeSelection()
+			return m, nil
 
 		default:
 			if action, ok := actionForKey(msg.String()); ok {
@@ -127,6 +145,37 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m Model) updateFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.filterMode = false
+		return m, nil
+
+	case "enter":
+		m.filterMode = false
+		m.normalizeSelection()
+		return m, nil
+
+	case "backspace":
+		if len(m.filterText) > 0 {
+			m.filterText = m.filterText[:len(m.filterText)-1]
+			m.normalizeSelection()
+		}
+		return m, nil
+
+	case "ctrl+c":
+		return m, tea.Quit
+
+	default:
+		if len(msg.String()) == 1 {
+			m.filterText += msg.String()
+			m.normalizeSelection()
+		}
+
+		return m, nil
+	}
 }
 
 func (m *Model) moveUp() {
@@ -208,7 +257,13 @@ func (m Model) sortedServiceNames() []string {
 	entries := m.systemdManager.Store.GetServiceEntries()
 
 	serviceNames := make([]string, 0, len(entries))
+	filter := strings.ToLower(strings.TrimSpace(m.filterText))
+
 	for serviceName := range entries {
+		if filter != "" && !strings.Contains(strings.ToLower(serviceName), filter) {
+			continue
+		}
+
 		serviceNames = append(serviceNames, serviceName)
 	}
 
@@ -229,7 +284,7 @@ func (m Model) View() string {
 
 	footer := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("241")).
-		Render(footerText())
+		Render(m.renderFooter())
 
 	errorText := ""
 	if m.err != nil {
@@ -247,6 +302,13 @@ func (m Model) renderTable() string {
 	serviceNames := m.sortedServiceNames()
 
 	if len(serviceNames) == 0 {
+		if strings.TrimSpace(m.filterText) != "" {
+			return lipgloss.NewStyle().
+				Foreground(lipgloss.Color("244")).
+				Italic(true).
+				Render(fmt.Sprintf("No services matching /%s", m.filterText))
+		}
+
 		return lipgloss.NewStyle().
 			Foreground(lipgloss.Color("244")).
 			Italic(true).
@@ -312,3 +374,16 @@ func (m Model) renderTable() string {
 		}).
 		String()
 }
+
+func (m Model) renderFooter() string {
+	if m.filterMode {
+		return fmt.Sprintf("Filter: /%s | enter: apply | esc: close filter | backspace: delete", m.filterText)
+	}
+
+	if strings.TrimSpace(m.filterText) != "" {
+		return fmt.Sprintf("Filter: /%s | /: new filter | esc: clear filter | %s", m.filterText, footerText())
+	}
+
+	return footerText()
+}
+

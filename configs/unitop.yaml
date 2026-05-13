@@ -19,17 +19,6 @@ services:
   - wpa_supplicant.service
   - systemd-resolved.service
 
-properties:
-  - Id
-  - LoadState
-  - ActiveState
-  - SubState
-  - UnitFileState
-  - MainPID
-  - NRestarts
-  - ExecMainStatus
-  - ActiveEnterTimestamp
-
 discovery:
   include:
     - "*.service"
