@@ -47,4 +47,3 @@ func footerText() string {
 
 	return strings.Join(parts, " • ")
 }
-

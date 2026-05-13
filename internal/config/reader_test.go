@@ -8,6 +8,7 @@ import (
 
 func TestReadConfig(t *testing.T) {
 	validConfig := `
+mode: all
 refresh_interval: 5s
 
 services:
@@ -16,6 +17,15 @@ services:
 properties:
   - ActiveState
   - SubState
+
+discovery:
+  include:
+    - "*.service"
+  exclude:
+    - "systemd-*"
+  states:
+    - enabled
+    - disabled
 `
 
 	invalidConfig := `
@@ -30,6 +40,20 @@ properties:
   - SubState
 `
 
+	invalidDiscoveryPatternConfig := `
+refresh_interval: 5s
+
+services:
+  - docker.service
+
+properties:
+  - ActiveState
+
+discovery:
+  include:
+    - "[broken"
+`
+
 	tests := []struct {
 		name         string
 		content      string
@@ -37,6 +61,8 @@ properties:
 		wantErr      bool
 		wantRefresh  string
 		wantServices int
+		wantMode     string
+		wantStates   int
 	}{
 		{
 			name:         "successful parse",
@@ -45,6 +71,8 @@ properties:
 			wantErr:      false,
 			wantRefresh:  "5s",
 			wantServices: 1,
+			wantMode:     "all",
+			wantStates:   2,
 		},
 		{
 			name:    "wrong path",
@@ -54,6 +82,12 @@ properties:
 		{
 			name:    "invalid yaml",
 			content: invalidConfig,
+			path:    "unitop.yaml",
+			wantErr: true,
+		},
+		{
+			name:    "invalid discovery pattern",
+			content: invalidDiscoveryPatternConfig,
 			path:    "unitop.yaml",
 			wantErr: true,
 		},
@@ -103,6 +137,14 @@ properties:
 
 			if len(cfg.ServiceNames) != tt.wantServices {
 				t.Errorf("expected %d services, got %d", tt.wantServices, len(cfg.ServiceNames))
+			}
+
+			if cfg.Mode != tt.wantMode {
+				t.Errorf("expected mode %s, got %s", tt.wantMode, cfg.Mode)
+			}
+
+			if len(cfg.Discovery.States) != tt.wantStates {
+				t.Errorf("expected %d discovery states, got %d", tt.wantStates, len(cfg.Discovery.States))
 			}
 		})
 	}

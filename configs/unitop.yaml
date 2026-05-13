@@ -1,4 +1,4 @@
-mode: selected # selected | all
+mode: all # selected | all
 refresh_interval: 5s
 
 services:
@@ -36,3 +36,11 @@ discovery:
   exclude:
     - "systemd-*"
     - "user@*.service"
+    - "getty@*.service"
+    - "autovt@*.service"
+  states:
+    - disabled
+    - enabled
+    - enabled-runtime
+    - linked
+    - linked-runtime

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -22,5 +23,25 @@ func ReadConfig(path string) (*AppConfig, error) {
 		return nil, fmt.Errorf("failed to parse a config from yaml: %w", err)
 	}
 
+	if err := validateDiscoveryPatterns(config.Discovery); err != nil {
+		return nil, err
+	}
+
 	return &config, nil
+}
+
+func validateDiscoveryPatterns(discovery DiscoveryConfig) error {
+	for _, pattern := range discovery.Include {
+		if _, err := filepath.Match(pattern, ""); err != nil {
+			return fmt.Errorf("invalid discovery include pattern %q: %w", pattern, err)
+		}
+	}
+
+	for _, pattern := range discovery.Exclude {
+		if _, err := filepath.Match(pattern, ""); err != nil {
+			return fmt.Errorf("invalid discovery exclude pattern %q: %w", pattern, err)
+		}
+	}
+
+	return nil
 }

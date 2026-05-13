@@ -39,7 +39,6 @@ func (m *SystemdManager) MonitorState() error {
 	entries := m.Store.GetServiceEntries()
 
 	var wg sync.WaitGroup
-	errCh := make(chan error, len(entries))
 
 	sem := make(chan struct{}, 10)
 
@@ -56,7 +55,7 @@ func (m *SystemdManager) MonitorState() error {
 
 			commandOutput, err := m.Execute(*command)
 			if err != nil {
-				errCh <- fmt.Errorf("failed to monitor %s: %w", serviceID, err)
+				m.Store.UpdateServiceEntry(serviceID, failedServiceParams(serviceID, m.Properties))
 				return
 			}
 
@@ -67,11 +66,6 @@ func (m *SystemdManager) MonitorState() error {
 	}
 
 	wg.Wait()
-	close(errCh)
-
-	for err := range errCh {
-		return err
-	}
 
 	return nil
 }
@@ -98,4 +92,19 @@ func (m *SystemdManager) ExecuteAction(
 	}
 
 	return nil
+}
+
+func failedServiceParams(serviceID string, properties []string) map[string]string {
+	params := make(map[string]string, len(properties))
+	for _, property := range properties {
+		params[property] = ""
+	}
+
+	params["Id"] = serviceID
+	params["ID"] = serviceID
+	params["LoadState"] = "error"
+	params["ActiveState"] = "unknown"
+	params["SubState"] = "show failed"
+
+	return params
 }

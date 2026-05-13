@@ -19,6 +19,24 @@ func TestBuildSystemctlShowWithArgsSuccess(t *testing.T) {
 	}
 }
 
+func TestBuildSystemctlListUnitFilesCommand(t *testing.T) {
+	command := BuildSystemctlListUnitFilesCommand()
+	expectedArgs := []string{
+		"list-unit-files",
+		"--type=service",
+		"--no-legend",
+		"--no-pager",
+	}
+
+	if command.Name != "systemctl" {
+		t.Fatalf("expected command name systemctl, got %s", command.Name)
+	}
+
+	if !reflect.DeepEqual(expectedArgs, command.Args) {
+		t.Fatalf("expected args %v, got %v", expectedArgs, command.Args)
+	}
+}
+
 func createExpectedCommand() *model.Command {
 	commandName := "systemctl"
 	args := []string{

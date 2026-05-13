@@ -15,6 +15,17 @@ func BuildSystemctlShowWithArgs(serviceID string, properties []string) *model.Co
 	return model.NewCommand("systemctl", args)
 }
 
+func BuildSystemctlListUnitFilesCommand() *model.Command {
+	args := []string{
+		"list-unit-files",
+		"--type=service",
+		"--no-legend",
+		"--no-pager",
+	}
+
+	return model.NewCommand("systemctl", args)
+}
+
 func BuildSystemctlActionCommand(serviceID string, action string) *model.Command {
 	args := []string{action, serviceID}
 	return model.NewCommand("systemctl", args)

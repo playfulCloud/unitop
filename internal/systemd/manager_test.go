@@ -3,7 +3,6 @@ package systemd
 import (
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/playfulCloud/unitop/internal/model"
@@ -52,7 +51,7 @@ func TestSystemdManagerMonitorStateSuccess(t *testing.T) {
 	}
 }
 
-func TestSystemdManagerMonitorStateReturnsErrorWhenExecuteFails(t *testing.T) {
+func TestSystemdManagerMonitorStateMarksFailedServiceWhenExecuteFails(t *testing.T) {
 	serviceStore := store.NewServiceStore(
 		[]string{"docker.service"},
 		[]string{"ID", "LoadState", "ActiveState"},
@@ -68,12 +67,25 @@ func TestSystemdManagerMonitorStateReturnsErrorWhenExecuteFails(t *testing.T) {
 	}
 
 	err := manager.MonitorState()
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if !strings.Contains(err.Error(), "failed to monitor docker.service") {
-		t.Fatalf("expected error to contain service ID, got %v", err)
+	entry, exists := serviceStore.GetServiceEntry("docker.service")
+	if !exists {
+		t.Fatal("expected docker.service to exist")
+	}
+
+	if entry.Params["LoadState"] != "error" {
+		t.Fatalf("expected LoadState error, got %s", entry.Params["LoadState"])
+	}
+
+	if entry.Params["ActiveState"] != "unknown" {
+		t.Fatalf("expected ActiveState unknown, got %s", entry.Params["ActiveState"])
+	}
+
+	if entry.Params["SubState"] != "show failed" {
+		t.Fatalf("expected SubState show failed, got %s", entry.Params["SubState"])
 	}
 }
 

@@ -2,9 +2,11 @@ package main
 
 import (
 	"log"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/playfulCloud/unitop/internal/cmdclient"
 	"github.com/playfulCloud/unitop/internal/config"
 	"github.com/playfulCloud/unitop/internal/store"
 	"github.com/playfulCloud/unitop/internal/systemd"
@@ -16,12 +18,29 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	store := store.NewServiceStore(cfg.ServiceNames, cfg.Properties)
+
+	serviceNames := cfg.ServiceNames
+	if strings.EqualFold(cfg.Mode, "all") {
+		serviceNames, err = systemd.DiscoverServiceNames(cfg.Discovery, cmdclient.Execute)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	refreshInterval := 5 * time.Second
+	if cfg.RefreshInterval != "" {
+		refreshInterval, err = time.ParseDuration(cfg.RefreshInterval)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	store := store.NewServiceStore(serviceNames, cfg.Properties)
 	c := systemd.NewSystemdManager(store, cfg.Properties)
 	c.MonitorState()
 
 	p := tea.NewProgram(
-		tui.NewModel(c, 5*time.Second),
+		tui.NewModel(c, refreshInterval),
 		tea.WithAltScreen(),
 	)
 
