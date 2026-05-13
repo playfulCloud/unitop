@@ -279,3 +279,72 @@ func newTestManagerWithServices(
 
 	return manager
 }
+
+func TestJournalctlDoesNothingWhenNoServiceSelected(t *testing.T) {
+	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
+		t.Fatal("expected no command execution")
+		return "", nil
+	})
+
+	m := NewModel(manager, time.Second)
+	m.selectedServiceID = ""
+
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+
+	if cmd != nil {
+		t.Fatalf("expected no command when no service is selected, got %T", cmd)
+	}
+}
+
+func TestJournalctlDoneStoresError(t *testing.T) {
+	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
+		return "", nil
+	})
+
+	m := NewModel(manager, time.Second)
+	journalErr := errors.New("journalctl failed")
+
+	updated, cmd := m.Update(journalctlDoneMsg{err: journalErr})
+	updatedModel := updated.(Model)
+
+	if cmd != nil {
+		t.Fatalf("expected no command after journalctl completes, got %T", cmd)
+	}
+
+	if !errors.Is(updatedModel.err, journalErr) {
+		t.Fatalf("expected journalctl error to be stored, got %v", updatedModel.err)
+	}
+}
+
+func TestFilterBackspaceRemovesLastCharacter(t *testing.T) {
+	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
+		return "", nil
+	})
+
+	m := NewModel(manager, time.Second)
+	m.filterMode = true
+	m.filterText = "dock"
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	updatedModel := updated.(Model)
+
+	if updatedModel.filterText != "doc" {
+		t.Fatalf("expected filter text to be shortened, got %q", updatedModel.filterText)
+	}
+}
+
+func TestEscapeClearsAppliedFilter(t *testing.T) {
+	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
+		return "", nil
+	})
+
+	m := NewModel(manager, time.Second)
+	m.filterText = "dock"
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	updatedModel := updated.(Model)
+
+	if updatedModel.filterText != "" {
+		t.Fatalf("expected filter text to be cleared, got %q", updatedModel.filterText)
+	}
+}

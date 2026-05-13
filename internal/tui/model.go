@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os/exec"
 	"sort"
 	"strings"
 	"time"
@@ -20,6 +21,10 @@ type monitorDoneMsg struct {
 }
 
 type actionDoneMsg struct {
+	err error
+}
+
+type journalctlDoneMsg struct {
 	err error
 }
 
@@ -58,6 +63,15 @@ func monitorStateCmd(manager *systemd.SystemdManager) tea.Cmd {
 		err := manager.MonitorState()
 		return monitorDoneMsg{err: err}
 	}
+}
+
+func enterJournalctlCmd(serviceID string) tea.Cmd {
+	command := systemd.BuildJournalctlCommand(serviceID)
+	cmd := exec.Command(command.Name, command.Args...)
+
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		return journalctlDoneMsg{err: err}
+	})
 }
 
 func executeActionCmd(
@@ -103,6 +117,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.monitoring = true
 		return m, monitorStateCmd(m.systemdManager)
 
+	case journalctlDoneMsg:
+		m.err = msg.err
+		return m, nil
+
 	case tea.KeyMsg:
 		if m.filterMode {
 			return m.updateFilter(msg)
@@ -128,6 +146,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.filterText = ""
 			m.normalizeSelection()
 			return m, nil
+
+		case "l":
+			if m.selectedServiceID == "" {
+				return m, nil
+			}
+
+			return m, enterJournalctlCmd(m.selectedServiceID)
 
 		default:
 			if action, ok := actionForKey(msg.String()); ok {
@@ -377,11 +402,18 @@ func (m Model) renderTable() string {
 
 func (m Model) renderFooter() string {
 	if m.filterMode {
-		return fmt.Sprintf("Filter: /%s | enter: apply | esc: close filter | backspace: delete", m.filterText)
+		return fmt.Sprintf(
+			"Filter: /%s | enter: apply | esc: close filter | backspace: delete",
+			m.filterText,
+		)
 	}
 
 	if strings.TrimSpace(m.filterText) != "" {
-		return fmt.Sprintf("Filter: /%s | /: new filter | esc: clear filter | %s", m.filterText, footerText())
+		return fmt.Sprintf(
+			"Filter: /%s | /: new filter | esc: clear filter | %s",
+			m.filterText,
+			footerText(),
+		)
 	}
 
 	return footerText()
