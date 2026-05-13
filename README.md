@@ -43,13 +43,26 @@ make build
 ./bin/unitop
 ```
 
-At the moment, Unitop reads its config from:
+By default, Unitop reads its config from:
 
 ```text
-configs/unitop.yaml
+~/.config/unitop/unitop.yaml
 ```
 
-Run it from the repository root until configurable config paths are added.
+If the file does not exist, Unitop creates it with a standard configuration on
+first run.
+
+Use a custom config path with:
+
+```sh
+unitop --config ./configs/unitop.yaml
+```
+
+Print the current version with:
+
+```sh
+unitop --version
+```
 
 ## Configuration
 
@@ -155,8 +168,6 @@ distribution.
 
 Planned improvements:
 
-- `--config` and standard user config path support
-- `--version` and improved CLI help
 - Safer action lifecycle handling
 - Configurable command timeouts
 - Better startup behavior for large service lists

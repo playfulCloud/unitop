@@ -27,6 +27,7 @@ vendor/
 # Build folders
 bin/
 dist/
+/unitop
 
 # Env/config
 .env

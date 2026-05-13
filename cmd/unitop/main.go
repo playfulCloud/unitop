@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -13,8 +15,28 @@ import (
 	"github.com/playfulCloud/unitop/internal/tui"
 )
 
+var version = "dev"
+
 func main() {
-	cfg, err := config.ReadConfig("configs/unitop.yaml")
+	configPath := flag.String("config", "", "path to config file")
+	showVersion := flag.Bool("version", false, "print version and exit")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("unitop %s\n", version)
+		return
+	}
+
+	if *configPath == "" {
+		defaultConfigPath, err := config.DefaultConfigPath()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		*configPath = defaultConfigPath
+	}
+
+	cfg, err := config.ReadOrCreateConfig(*configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -32,6 +54,10 @@ func main() {
 		refreshInterval, err = time.ParseDuration(cfg.RefreshInterval)
 		if err != nil {
 			log.Fatal(err)
+		}
+
+		if refreshInterval <= 0 {
+			log.Fatal("refresh_interval must be greater than zero")
 		}
 	}
 
