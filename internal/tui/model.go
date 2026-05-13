@@ -28,6 +28,12 @@ type journalctlDoneMsg struct {
 	err error
 }
 
+const (
+	defaultTableHeight = 20
+	minTableHeight     = 5
+	verticalChromeRows = 7
+)
+
 type Model struct {
 	systemdManager    *systemd.SystemdManager
 	err               error
@@ -47,7 +53,7 @@ func NewModel(systemdManager *systemd.SystemdManager, interval time.Duration) Mo
 	return Model{
 		systemdManager: systemdManager,
 		interval:       interval,
-		tableHeight:    20,
+		tableHeight:    defaultTableHeight,
 		monitoring:     true,
 	}
 }
@@ -94,6 +100,11 @@ func executeActionCmd(
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.resizeTable(msg.Height)
+		m.normalizeSelection()
+		return m, nil
+
 	case tickMsg:
 		if m.monitoring {
 			return m, tick(m.interval)
@@ -188,6 +199,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m *Model) resizeTable(windowHeight int) {
+	tableHeight := windowHeight - verticalChromeRows
+	if tableHeight < minTableHeight {
+		tableHeight = minTableHeight
+	}
+
+	m.tableHeight = tableHeight
 }
 
 func (m Model) updateFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

@@ -98,6 +98,72 @@ func TestMonitorDoneClearsMonitoringAndNormalizesSelection(t *testing.T) {
 	}
 }
 
+func TestWindowSizeUpdatesTableHeight(t *testing.T) {
+	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
+		return "", nil
+	})
+	m := NewModel(manager, time.Second)
+
+	updated, cmd := m.Update(tea.WindowSizeMsg{Height: 30, Width: 120})
+	updatedModel := updated.(Model)
+
+	if cmd != nil {
+		t.Fatalf("expected no command after resize, got %T", cmd)
+	}
+
+	expectedHeight := 30 - verticalChromeRows
+	if updatedModel.tableHeight != expectedHeight {
+		t.Fatalf("expected table height %d, got %d", expectedHeight, updatedModel.tableHeight)
+	}
+}
+
+func TestWindowSizeKeepsMinimumTableHeight(t *testing.T) {
+	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
+		return "", nil
+	})
+	m := NewModel(manager, time.Second)
+
+	updated, _ := m.Update(tea.WindowSizeMsg{Height: 3, Width: 120})
+	updatedModel := updated.(Model)
+
+	if updatedModel.tableHeight != minTableHeight {
+		t.Fatalf("expected minimum table height %d, got %d", minTableHeight, updatedModel.tableHeight)
+	}
+}
+
+func TestWindowSizeAdjustsViewportForSelection(t *testing.T) {
+	manager := newTestManagerWithServices(t,
+		[]string{
+			"alpha.service",
+			"bravo.service",
+			"charlie.service",
+			"delta.service",
+			"echo.service",
+			"foxtrot.service",
+			"golf.service",
+			"hotel.service",
+		},
+		func(command domainmodel.Command) (string, error) {
+			return "", nil
+		},
+	)
+	m := NewModel(manager, time.Second)
+	m.selectedServiceID = "hotel.service"
+	m.viewportOffset = 0
+
+	updated, _ := m.Update(tea.WindowSizeMsg{Height: 12, Width: 120})
+	updatedModel := updated.(Model)
+
+	if updatedModel.tableHeight != minTableHeight {
+		t.Fatalf("expected table height %d, got %d", minTableHeight, updatedModel.tableHeight)
+	}
+
+	expectedOffset := 3
+	if updatedModel.viewportOffset != expectedOffset {
+		t.Fatalf("expected viewport offset %d, got %d", expectedOffset, updatedModel.viewportOffset)
+	}
+}
+
 func TestActionDoneDoesNotScheduleTickWhileMonitorIsRunning(t *testing.T) {
 	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
 		t.Fatal("expected no command execution")
