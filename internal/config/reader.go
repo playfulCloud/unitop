@@ -11,7 +11,7 @@ func ReadConfig(path string) (*AppConfig, error) {
 	dataFromConfigFile, err := os.ReadFile(path)
 
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read a config: %w", err)
+		return nil, fmt.Errorf("failed to read a config: %w", err)
 	}
 
 	var config AppConfig
@@ -19,7 +19,7 @@ func ReadConfig(path string) (*AppConfig, error) {
 	err = yaml.Unmarshal(dataFromConfigFile, &config)
 
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse a config from yaml: %w", err)
+		return nil, fmt.Errorf("failed to parse a config from yaml: %w", err)
 	}
 
 	return &config, nil

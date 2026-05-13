@@ -3,7 +3,6 @@ package systemd
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/playfulCloud/unitop/internal/cmdclient"
 	"github.com/playfulCloud/unitop/internal/store"
@@ -37,7 +36,7 @@ func (m *SystemdManager) MonitorState() error {
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(entries))
 
-	sem := make(chan struct{}, 10) // max 10 komend naraz
+	sem := make(chan struct{}, 10)
 
 	for serviceID := range entries {
 		wg.Add(1)
@@ -92,7 +91,6 @@ func (m *SystemdManager) ExecuteAction(
 			string(output),
 		)
 	}
-	time.Sleep(10 * time.Second)
 
 	return nil
 }
