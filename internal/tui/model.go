@@ -14,24 +14,29 @@ import (
 
 type tickMsg time.Time
 
+type monitorDoneMsg struct {
+	err error
+}
+
 type actionDoneMsg struct {
 	err error
 }
 
 type Model struct {
-	sytemdManager     *systemd.SystemdManager
+	systemdManager    *systemd.SystemdManager
 	err               error
 	interval          time.Duration
 	selectedServiceID string
 	viewportOffset    int
 	tableHeight       int
+	monitoring        bool
 }
 
 func NewModel(systemdManager *systemd.SystemdManager, interval time.Duration) Model {
 	return Model{
-		sytemdManager: systemdManager,
-		interval:      interval,
-		tableHeight:   20,
+		systemdManager: systemdManager,
+		interval:       interval,
+		tableHeight:    20,
 	}
 }
 
@@ -43,6 +48,13 @@ func tick(interval time.Duration) tea.Cmd {
 	return tea.Tick(interval, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
+}
+
+func monitorStateCmd(manager *systemd.SystemdManager) tea.Cmd {
+	return func() tea.Msg {
+		err := manager.MonitorState()
+		return monitorDoneMsg{err: err}
+	}
 }
 
 func executeActionCmd(
@@ -59,23 +71,34 @@ func executeActionCmd(
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
-		if err := m.sytemdManager.MonitorState(); err != nil {
-			m.err = err
-		} else {
-			m.err = nil
+		if m.monitoring {
+			return m, tick(m.interval)
 		}
 
+		m.monitoring = true
+		return m, tea.Batch(
+			monitorStateCmd(m.systemdManager),
+			tick(m.interval),
+		)
+
+	case monitorDoneMsg:
+		m.monitoring = false
+		m.err = msg.err
 		m.normalizeSelection()
-		return m, tick(m.interval)
+		return m, nil
 
 	case actionDoneMsg:
+		m.err = msg.err
 		if msg.err != nil {
-			m.err = msg.err
-		} else {
-			m.err = nil
+			return m, nil
 		}
 
-		return m, tick(m.interval)
+		if m.monitoring {
+			return m, nil
+		}
+
+		m.monitoring = true
+		return m, monitorStateCmd(m.systemdManager)
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -95,7 +118,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				return m, executeActionCmd(
-					m.sytemdManager,
+					m.systemdManager,
 					m.selectedServiceID,
 					action,
 				)
@@ -182,7 +205,7 @@ func (m Model) currentSelectedIndex(serviceNames []string) int {
 }
 
 func (m Model) sortedServiceNames() []string {
-	entries := m.sytemdManager.Store.GetServiceEntries()
+	entries := m.systemdManager.Store.GetServiceEntries()
 
 	serviceNames := make([]string, 0, len(entries))
 	for serviceName := range entries {
@@ -220,7 +243,7 @@ func (m Model) View() string {
 }
 
 func (m Model) renderTable() string {
-	entries := m.sytemdManager.Store.GetServiceEntries()
+	entries := m.systemdManager.Store.GetServiceEntries()
 	serviceNames := m.sortedServiceNames()
 
 	if len(serviceNames) == 0 {
