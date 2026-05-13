@@ -30,7 +30,16 @@ policy. Unitop does not currently manage `sudo` for you.
 
 ## Install
 
-The project can be run directly from source:
+Install the latest tagged version with Go:
+
+```sh
+go install github.com/playfulCloud/unitop/cmd/unitop@latest
+```
+
+Or download a prebuilt Linux binary from the
+[GitHub releases](https://github.com/playfulCloud/unitop/releases) page.
+
+The project can also be run directly from source:
 
 ```sh
 go run ./cmd/unitop
@@ -163,17 +172,16 @@ make build
 
 ## Project Status
 
-Unitop is usable as a source-built tool and is still being hardened for broader
-distribution.
+Unitop is usable as a source-built or release-built tool. It creates a default
+config on first run, supports custom config paths, blocks duplicate service
+actions, uses longer timeouts for service actions, starts monitoring
+asynchronously, and adapts the table height to the terminal size.
 
 Planned improvements:
 
-- Safer action lifecycle handling
-- Configurable command timeouts
-- Better startup behavior for large service lists
-- Terminal-size-aware layout
-- GitHub release builds
 - Homebrew tap and AUR packaging
+- Shell completions
+- Changelog
 
 ## License
 
