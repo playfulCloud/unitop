@@ -18,7 +18,8 @@ func main() {
 		panic(err)
 	}
 	store := store.NewServiceStore(cfg.ServiceNames, cfg.Properties)
-	c := systemd.NewSystemdManager(*store, cfg.Properties)
+	c := systemd.NewSystemdManager(store, cfg.Properties)
+	c.MonitorState()
 
 	p := tea.NewProgram(
 		tui.NewModel(c, 5*time.Second),

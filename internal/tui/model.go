@@ -19,7 +19,7 @@ type actionDoneMsg struct {
 }
 
 type Model struct {
-	collector         *systemd.SystemdManager
+	sytemdManager     *systemd.SystemdManager
 	err               error
 	interval          time.Duration
 	selectedServiceID string
@@ -27,11 +27,11 @@ type Model struct {
 	tableHeight       int
 }
 
-func NewModel(collector *systemd.SystemdManager, interval time.Duration) Model {
+func NewModel(systemdManager *systemd.SystemdManager, interval time.Duration) Model {
 	return Model{
-		collector:   collector,
-		interval:    interval,
-		tableHeight: 20,
+		sytemdManager: systemdManager,
+		interval:      interval,
+		tableHeight:   20,
 	}
 }
 
@@ -59,7 +59,7 @@ func executeActionCmd(
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
-		if err := m.collector.MonitorState(); err != nil {
+		if err := m.sytemdManager.MonitorState(); err != nil {
 			m.err = err
 		} else {
 			m.err = nil
@@ -95,7 +95,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				return m, executeActionCmd(
-					m.collector,
+					m.sytemdManager,
 					m.selectedServiceID,
 					action,
 				)
@@ -182,7 +182,7 @@ func (m Model) currentSelectedIndex(serviceNames []string) int {
 }
 
 func (m Model) sortedServiceNames() []string {
-	entries := m.collector.Store.GetServiceEntries()
+	entries := m.sytemdManager.Store.GetServiceEntries()
 
 	serviceNames := make([]string, 0, len(entries))
 	for serviceName := range entries {
@@ -220,7 +220,7 @@ func (m Model) View() string {
 }
 
 func (m Model) renderTable() string {
-	entries := m.collector.Store.GetServiceEntries()
+	entries := m.sytemdManager.Store.GetServiceEntries()
 	serviceNames := m.sortedServiceNames()
 
 	if len(serviceNames) == 0 {

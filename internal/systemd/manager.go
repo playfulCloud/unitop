@@ -2,6 +2,7 @@ package systemd
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/playfulCloud/unitop/internal/cmdclient"
@@ -9,7 +10,7 @@ import (
 )
 
 type SystemdManager struct {
-	Store      store.ServiceStore
+	Store      *store.ServiceStore
 	Properties []string
 }
 
@@ -23,25 +24,51 @@ const (
 	DisableAction ServiceAction = "disable"
 )
 
-func NewSystemdManager(store store.ServiceStore, properties []string) *SystemdManager {
+func NewSystemdManager(store *store.ServiceStore, properties []string) *SystemdManager {
 	return &SystemdManager{
 		Store:      store,
 		Properties: properties,
 	}
 }
 
-func (c *SystemdManager) MonitorState() error {
-	entries := c.Store.GetServiceEntries()
+func (m *SystemdManager) MonitorState() error {
+	entries := m.Store.GetServiceEntries()
 
-	for key := range entries {
-		command := BuildSystemctlShowWithArgs(key, c.Properties)
-		commandOutput, err := cmdclient.Execute(*command)
-		if err != nil {
-			return fmt.Errorf("Error while executing command: %w", err)
-		}
-		updatedProperties := parseCommandOutput(commandOutput)
-		c.Store.UpdateServiceEntry(key, updatedProperties)
+	var wg sync.WaitGroup
+	errCh := make(chan error, len(entries))
+
+	sem := make(chan struct{}, 10) // max 10 komend naraz
+
+	for serviceID := range entries {
+		wg.Add(1)
+
+		go func(serviceID string) {
+			defer wg.Done()
+
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			command := BuildSystemctlShowWithArgs(serviceID, m.Properties)
+
+			commandOutput, err := cmdclient.Execute(*command)
+			if err != nil {
+				errCh <- fmt.Errorf("failed to monitor %s: %w", serviceID, err)
+				return
+			}
+
+			updatedProperties := parseCommandOutput(commandOutput)
+
+			m.Store.UpdateServiceEntry(serviceID, updatedProperties)
+		}(serviceID)
 	}
+
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		return err
+	}
+
 	return nil
 }
 
