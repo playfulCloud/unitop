@@ -32,18 +32,15 @@ func actionForKey(key string) (systemd.ServiceAction, bool) {
 
 func footerText() string {
 	parts := []string{
-		"↑/↓ navigate",
-		"j/k navigate",
+		"↑↓ move",
+		"/ filter",
+		"l logs",
+		"r restart",
+		"s start",
+		"x stop",
+		"e/d enable",
+		"q quit",
 	}
 
-	for _, binding := range actionBindings {
-		parts = append(
-			parts,
-			binding.Key+" "+binding.Description,
-		)
-	}
-
-	parts = append(parts, "q quit")
-
-	return strings.Join(parts, " • ")
+	return strings.Join(parts, " | ")
 }
