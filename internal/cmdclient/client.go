@@ -9,8 +9,21 @@ import (
 	"github.com/playfulCloud/unitop/internal/model"
 )
 
+const (
+	MonitorTimeout = 5 * time.Second
+	ActionTimeout  = 60 * time.Second
+)
+
 func Execute(command model.Command) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	return ExecuteWithTimeout(command, MonitorTimeout)
+}
+
+func ExecuteAction(command model.Command) (string, error) {
+	return ExecuteWithTimeout(command, ActionTimeout)
+}
+
+func ExecuteWithTimeout(command model.Command, timeout time.Duration) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, command.Name, command.Args...)

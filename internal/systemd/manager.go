@@ -10,9 +10,10 @@ import (
 )
 
 type SystemdManager struct {
-	Store      *store.ServiceStore
-	Properties []string
-	Execute    ExecuteFunc
+	Store         *store.ServiceStore
+	Properties    []string
+	Execute       ExecuteFunc
+	ActionExecute ExecuteFunc
 }
 
 type ExecuteFunc func(command model.Command) (string, error)
@@ -29,9 +30,10 @@ const (
 
 func NewSystemdManager(store *store.ServiceStore, properties []string) *SystemdManager {
 	return &SystemdManager{
-		Store:      store,
-		Properties: properties,
-		Execute:    cmdclient.Execute,
+		Store:         store,
+		Properties:    properties,
+		Execute:       cmdclient.Execute,
+		ActionExecute: cmdclient.ExecuteAction,
 	}
 }
 
@@ -80,7 +82,7 @@ func (m *SystemdManager) ExecuteAction(
 		string(action),
 	)
 
-	output, err := m.Execute(*command)
+	output, err := m.ActionExecute(*command)
 	if err != nil {
 		return fmt.Errorf(
 			"command failed: %s %v: %w: %s",

@@ -102,7 +102,7 @@ func TestSystemdManagerExecuteActionSuccess(t *testing.T) {
 
 	var executedCommand model.Command
 
-	manager.Execute = func(command model.Command) (string, error) {
+	manager.ActionExecute = func(command model.Command) (string, error) {
 		executedCommand = command
 		return "", nil
 	}

@@ -33,6 +33,9 @@ type Model struct {
 	err               error
 	interval          time.Duration
 	selectedServiceID string
+	actionInFlight    bool
+	pendingAction     systemd.ServiceAction
+	pendingServiceID  string
 	viewportOffset    int
 	tableHeight       int
 	monitoring        bool
@@ -105,6 +108,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case actionDoneMsg:
+		m.actionInFlight = false
+		m.pendingAction = ""
+		m.pendingServiceID = ""
 		m.err = msg.err
 		if msg.err != nil {
 			return m, nil
@@ -156,9 +162,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		default:
 			if action, ok := actionForKey(msg.String()); ok {
+				if m.actionInFlight {
+					return m, nil
+				}
+
 				if m.selectedServiceID == "" {
 					return m, nil
 				}
+
+				m.actionInFlight = true
+				m.pendingAction = action
+				m.pendingServiceID = m.selectedServiceID
 
 				return m, executeActionCmd(
 					m.systemdManager,
@@ -401,6 +415,14 @@ func (m Model) renderTable() string {
 }
 
 func (m Model) renderFooter() string {
+	if m.actionInFlight {
+		return fmt.Sprintf(
+			"Running: %s %s",
+			m.pendingAction,
+			m.pendingServiceID,
+		)
+	}
+
 	if m.filterMode {
 		return fmt.Sprintf(
 			"Filter: /%s | enter: apply | esc: close filter | backspace: delete",
@@ -418,4 +440,3 @@ func (m Model) renderFooter() string {
 
 	return footerText()
 }
-

@@ -101,6 +101,10 @@ func TestActionDoneWithErrorDoesNotStartMonitor(t *testing.T) {
 	if !errors.Is(updatedModel.err, actionErr) {
 		t.Fatalf("expected action error to be stored, got %v", updatedModel.err)
 	}
+
+	if updatedModel.actionInFlight {
+		t.Fatal("expected action state to be cleared after failed action")
+	}
 }
 
 func TestActionDoneSchedulesSingleImmediateMonitor(t *testing.T) {
@@ -129,6 +133,85 @@ func TestActionDoneSchedulesSingleImmediateMonitor(t *testing.T) {
 
 	if calls != 1 {
 		t.Fatalf("expected one monitor execution, got %d", calls)
+	}
+
+	if updatedModel.actionInFlight {
+		t.Fatal("expected action state to be cleared after successful action")
+	}
+}
+
+func TestActionKeyMarksActionInFlight(t *testing.T) {
+	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
+		return "", nil
+	})
+	m := NewModel(manager, time.Second)
+	m.selectedServiceID = "docker.service"
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	updatedModel := updated.(Model)
+
+	if cmd == nil {
+		t.Fatal("expected action command")
+	}
+
+	if !updatedModel.actionInFlight {
+		t.Fatal("expected action to be marked in flight")
+	}
+
+	if updatedModel.pendingAction != systemd.StopAction {
+		t.Fatalf("expected pending action stop, got %q", updatedModel.pendingAction)
+	}
+
+	if updatedModel.pendingServiceID != "docker.service" {
+		t.Fatalf("expected pending service docker.service, got %q", updatedModel.pendingServiceID)
+	}
+}
+
+func TestActionKeyIgnoredWhileActionInFlight(t *testing.T) {
+	executed := false
+	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
+		executed = true
+		return "", nil
+	})
+	m := NewModel(manager, time.Second)
+	m.selectedServiceID = "docker.service"
+	m.actionInFlight = true
+	m.pendingAction = systemd.StopAction
+	m.pendingServiceID = "docker.service"
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	updatedModel := updated.(Model)
+
+	if cmd != nil {
+		t.Fatalf("expected no command while action is in flight, got %T", cmd)
+	}
+
+	if executed {
+		t.Fatal("expected no action execution while action is in flight")
+	}
+
+	if !updatedModel.actionInFlight {
+		t.Fatal("expected action to remain in flight")
+	}
+
+	if updatedModel.pendingAction != systemd.StopAction {
+		t.Fatalf("expected pending action to remain stop, got %q", updatedModel.pendingAction)
+	}
+}
+
+func TestActionFooterShowsInFlightAction(t *testing.T) {
+	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
+		return "", nil
+	})
+	m := NewModel(manager, time.Second)
+	m.actionInFlight = true
+	m.pendingAction = systemd.RestartAction
+	m.pendingServiceID = "docker.service"
+
+	footer := m.renderFooter()
+
+	if footer != "Running: restart docker.service" {
+		t.Fatalf("expected running action footer, got %q", footer)
 	}
 }
 
