@@ -163,3 +163,7 @@ Planned improvements:
 - Terminal-size-aware layout
 - GitHub release builds
 - Homebrew tap and AUR packaging
+
+## License
+
+Unitop is distributed under the MIT License. See [LICENSE](LICENSE).
