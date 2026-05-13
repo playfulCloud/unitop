@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,12 +12,46 @@ import (
 	"github.com/playfulCloud/unitop/internal/systemd"
 )
 
+func TestInitSchedulesInitialMonitorAndTick(t *testing.T) {
+	var calls atomic.Int32
+	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
+		calls.Add(1)
+		return "LoadState=loaded\nActiveState=active\n", nil
+	})
+	m := NewModel(manager, time.Second)
+
+	cmd := m.Init()
+	if cmd == nil {
+		t.Fatal("expected init command")
+	}
+
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	if !ok {
+		t.Fatalf("expected batch command, got %T", msg)
+	}
+
+	if len(batch) != 2 {
+		t.Fatalf("expected monitor and tick commands, got %d", len(batch))
+	}
+
+	monitorMsg := batch[0]()
+	if _, ok := monitorMsg.(monitorDoneMsg); !ok {
+		t.Fatalf("expected monitor done message, got %T", monitorMsg)
+	}
+
+	if calls.Load() != 1 {
+		t.Fatalf("expected one monitor execution, got %d", calls.Load())
+	}
+}
+
 func TestTickSchedulesMonitorWithoutRunningSynchronously(t *testing.T) {
 	manager := newTestManager(t, func(command domainmodel.Command) (string, error) {
 		t.Fatal("expected monitor command not to run during Update")
 		return "", nil
 	})
 	m := NewModel(manager, time.Second)
+	m.monitoring = false
 
 	updated, cmd := m.Update(tickMsg(time.Now()))
 	updatedModel := updated.(Model)
@@ -114,6 +149,7 @@ func TestActionDoneSchedulesSingleImmediateMonitor(t *testing.T) {
 		return "LoadState=loaded\nActiveState=active\n", nil
 	})
 	m := NewModel(manager, time.Second)
+	m.monitoring = false
 
 	updated, cmd := m.Update(actionDoneMsg{})
 	updatedModel := updated.(Model)

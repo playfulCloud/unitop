@@ -48,11 +48,15 @@ func NewModel(systemdManager *systemd.SystemdManager, interval time.Duration) Mo
 		systemdManager: systemdManager,
 		interval:       interval,
 		tableHeight:    20,
+		monitoring:     true,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	return tick(m.interval)
+	return tea.Batch(
+		monitorStateCmd(m.systemdManager),
+		tick(m.interval),
+	)
 }
 
 func tick(interval time.Duration) tea.Cmd {
