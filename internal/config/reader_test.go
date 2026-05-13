@@ -54,6 +54,21 @@ discovery:
     - "[broken"
 `
 
+	invalidModeConfig := `
+mode: broken
+refresh_interval: 5s
+
+services:
+  - docker.service
+`
+
+	emptySelectedServicesConfig := `
+mode: selected
+refresh_interval: 5s
+
+services: []
+`
+
 	tests := []struct {
 		name         string
 		content      string
@@ -88,6 +103,18 @@ discovery:
 		{
 			name:    "invalid discovery pattern",
 			content: invalidDiscoveryPatternConfig,
+			path:    "unitop.yaml",
+			wantErr: true,
+		},
+		{
+			name:    "invalid mode",
+			content: invalidModeConfig,
+			path:    "unitop.yaml",
+			wantErr: true,
+		},
+		{
+			name:    "selected mode without services",
+			content: emptySelectedServicesConfig,
 			path:    "unitop.yaml",
 			wantErr: true,
 		},

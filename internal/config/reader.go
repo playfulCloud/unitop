@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -27,7 +28,29 @@ func ReadConfig(path string) (*AppConfig, error) {
 		return nil, err
 	}
 
+	if err := validateMode(config); err != nil {
+		return nil, err
+	}
+
+	config.Mode = strings.ToLower(strings.TrimSpace(config.Mode))
+
 	return &config, nil
+}
+
+func validateMode(config AppConfig) error {
+	mode := strings.ToLower(strings.TrimSpace(config.Mode))
+	switch mode {
+	case ModeAll:
+		return nil
+	case ModeSelected:
+		if len(config.ServiceNames) == 0 {
+			return fmt.Errorf("services must contain at least one service when mode is %q", ModeSelected)
+		}
+
+		return nil
+	default:
+		return fmt.Errorf("invalid mode %q: expected %q or %q", config.Mode, ModeAll, ModeSelected)
+	}
 }
 
 func validateDiscoveryPatterns(discovery DiscoveryConfig) error {

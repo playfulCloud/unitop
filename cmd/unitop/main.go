@@ -42,11 +42,15 @@ func main() {
 	}
 
 	serviceNames := cfg.ServiceNames
-	if strings.EqualFold(cfg.Mode, "all") {
+	if strings.EqualFold(cfg.Mode, config.ModeAll) {
 		serviceNames, err = systemd.DiscoverServiceNames(cfg.Discovery, cmdclient.Execute)
 		if err != nil {
 			log.Fatal(err)
 		}
+	}
+
+	if len(serviceNames) == 0 {
+		log.Fatal("no services to monitor: update services or discovery settings in config")
 	}
 
 	refreshInterval := 5 * time.Second

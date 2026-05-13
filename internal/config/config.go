@@ -1,5 +1,10 @@
 package config
 
+const (
+	ModeAll      = "all"
+	ModeSelected = "selected"
+)
+
 type AppConfig struct {
 	Mode            string          `yaml:"mode"`
 	RefreshInterval string          `yaml:"refresh_interval"`
