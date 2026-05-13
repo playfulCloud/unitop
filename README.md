@@ -5,6 +5,8 @@ Unitop is a terminal UI for monitoring and managing systemd services.
 It gives you a live service table, name filtering, common `systemctl` actions,
 and quick access to recent `journalctl` logs without leaving the terminal.
 
+![Unitop demo](docs/demo.gif)
+
 ## Features
 
 - Live service state refresh from `systemctl show`
@@ -161,4 +163,3 @@ Planned improvements:
 - Terminal-size-aware layout
 - GitHub release builds
 - Homebrew tap and AUR packaging
-
