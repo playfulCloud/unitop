@@ -46,10 +46,13 @@ func TestUpdateServiceEntrySuccess(t *testing.T) {
 		t.Fatalf("expected operation to succeed, got %t", success)
 	}
 
-	paramMap := serviceStore.entries["docker.service"].Params
+	entry, exists := serviceStore.GetServiceEntry("docker.service")
+	if !exists {
+		t.Fatal("expected entry to exist")
+	}
 
 	for key, expectedValue := range states {
-		actualValue := paramMap[key]
+		actualValue := entry.Params[key]
 
 		if actualValue != expectedValue {
 			t.Fatalf("expected value of %s to be %s, got %s", key, expectedValue, actualValue)
@@ -109,5 +112,75 @@ func TestGetServiceEntryNotFound(t *testing.T) {
 
 	if entry != nil {
 		t.Fatalf("expected nil entry, got %+v", entry)
+	}
+}
+
+func TestGetServiceEntryReturnsClone(t *testing.T) {
+	serviceStore := newTestServiceStore()
+
+	entry, exists := serviceStore.GetServiceEntry("docker.service")
+	if !exists {
+		t.Fatal("expected entry to exist")
+	}
+
+	entry.Params["ActiveState"] = "modified"
+
+	entryAgain, exists := serviceStore.GetServiceEntry("docker.service")
+	if !exists {
+		t.Fatal("expected entry to exist")
+	}
+
+	if entryAgain.Params["ActiveState"] == "modified" {
+		t.Fatal("expected store to be protected from external mutation")
+	}
+}
+
+func TestGetServiceEntriesReturnsClones(t *testing.T) {
+	serviceStore := newTestServiceStore()
+
+	entries := serviceStore.GetServiceEntries()
+
+	entries["docker.service"].Params["ActiveState"] = "modified"
+
+	entryAgain, exists := serviceStore.GetServiceEntry("docker.service")
+	if !exists {
+		t.Fatal("expected entry to exist")
+	}
+
+	if entryAgain.Params["ActiveState"] == "modified" {
+		t.Fatal("expected store to be protected from external mutation")
+	}
+}
+
+func TestServiceStoreConcurrentAccess(t *testing.T) {
+	serviceStore := newTestServiceStore()
+
+	done := make(chan struct{})
+
+	for range 100 {
+		go func() {
+			for range 1000 {
+				serviceStore.UpdateServiceEntry("docker.service", map[string]string{
+					"ID":          "docker.service",
+					"LoadState":   "loaded",
+					"ActiveState": "active",
+				})
+			}
+
+			done <- struct{}{}
+		}()
+
+		go func() {
+			for range 1000 {
+				serviceStore.GetServiceEntry("docker.service")
+				serviceStore.GetServiceEntries()
+			}
+
+			done <- struct{}{}
+		}()
+	}
+
+	for range 200 {
+		<-done
 	}
 }

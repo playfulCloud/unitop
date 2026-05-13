@@ -15,7 +15,6 @@ func main() {
 	cfg, err := config.ReadConfig("configs/unitop.yaml")
 	if err != nil {
 		log.Fatal(err)
-		panic(err)
 	}
 	store := store.NewServiceStore(cfg.ServiceNames, cfg.Properties)
 	c := systemd.NewSystemdManager(store, cfg.Properties)

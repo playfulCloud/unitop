@@ -5,13 +5,17 @@ import (
 	"sync"
 
 	"github.com/playfulCloud/unitop/internal/cmdclient"
+	"github.com/playfulCloud/unitop/internal/model"
 	"github.com/playfulCloud/unitop/internal/store"
 )
 
 type SystemdManager struct {
 	Store      *store.ServiceStore
 	Properties []string
+	Execute    ExecuteFunc
 }
+
+type ExecuteFunc func(command model.Command) (string, error)
 
 type ServiceAction string
 
@@ -27,6 +31,7 @@ func NewSystemdManager(store *store.ServiceStore, properties []string) *SystemdM
 	return &SystemdManager{
 		Store:      store,
 		Properties: properties,
+		Execute:    cmdclient.Execute,
 	}
 }
 
@@ -49,7 +54,7 @@ func (m *SystemdManager) MonitorState() error {
 
 			command := BuildSystemctlShowWithArgs(serviceID, m.Properties)
 
-			commandOutput, err := cmdclient.Execute(*command)
+			commandOutput, err := m.Execute(*command)
 			if err != nil {
 				errCh <- fmt.Errorf("failed to monitor %s: %w", serviceID, err)
 				return
@@ -81,7 +86,7 @@ func (m *SystemdManager) ExecuteAction(
 		string(action),
 	)
 
-	output, err := cmdclient.Execute(*command)
+	output, err := m.Execute(*command)
 	if err != nil {
 		return fmt.Errorf(
 			"command failed: %s %v: %w: %s",

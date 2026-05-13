@@ -12,6 +12,9 @@ build:
 test:
 	gotestsum ./...
 
+test-race:
+	go test -race ./...
+
 test-v:
 	go test -v ./...
 
