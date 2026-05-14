@@ -15,7 +15,7 @@ func TestFooterTextIncludesLogsBinding(t *testing.T) {
 
 func TestFooterTextMatchesExpectedLayout(t *testing.T) {
 	footer := footerText()
-	expected := "↑↓ move | / filter | l logs | r restart | s start | x stop | e/d enable | q quit"
+	expected := "↑↓ move | / filter | l logs | r restart | s start | x stop | e/d enable/disable | q quit"
 
 	if footer != expected {
 		t.Fatalf("expected footer %q, got %q", expected, footer)

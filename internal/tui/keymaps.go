@@ -38,7 +38,7 @@ func footerText() string {
 		"r restart",
 		"s start",
 		"x stop",
-		"e/d enable",
+		"e/d enable/disable",
 		"q quit",
 	}
 
