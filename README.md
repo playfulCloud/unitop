@@ -30,7 +30,13 @@ policy. Unitop does not currently manage `sudo` for you.
 
 ## Install
 
-Install the latest tagged version with Go:
+Install the first release with Go:
+
+```sh
+go install github.com/playfulCloud/unitop/cmd/unitop@v0.1.0
+```
+
+Or install the latest tagged version:
 
 ```sh
 go install github.com/playfulCloud/unitop/cmd/unitop@latest
@@ -38,6 +44,7 @@ go install github.com/playfulCloud/unitop/cmd/unitop@latest
 
 Or download a prebuilt Linux binary from the
 [GitHub releases](https://github.com/playfulCloud/unitop/releases) page.
+Release binaries include the tagged version in `unitop --version`.
 
 The project can also be run directly from source:
 
@@ -72,6 +79,9 @@ Print the current version with:
 ```sh
 unitop --version
 ```
+
+When installed with `go install`, the version may show `dev` because Go builds
+the binary directly without the release workflow's version flags.
 
 ## Configuration
 
